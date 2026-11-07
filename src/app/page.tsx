@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle, Package, TrendingDown, DollarSign, ShieldAlert,
-  CheckCircle2, Filter, LogOut, Check, X, BarChart3, PieChart as PieIcon, ScrollText
+  CheckCircle2, Filter, LogOut, Check, X, BarChart3, PieChart as PieIcon, ScrollText, Bell
 } from "lucide-react";
 // [AUTH] helper login: token, fetch ber-token, cek hak akses
 import { authFetch, can, getToken, getUser, logout, type AuthUser } from "@/app/lib/auth";
@@ -49,6 +49,52 @@ export default function App() {
   const [mitigasiModal, setMitigasiModal] = useState<SKUItem | null>(null);
   const [actionType, setActionType] = useState("Transfer Stok");
   const [mitigasiNotes, setMitigasiNotes] = useState("");
+
+  // [NOTIF] notifikasi SKU melewati threshold (khusus Supply Chain)
+  interface NotifItem {
+    id: number; sku_code: string; product_name: string; sumber: string; risk_score: number;
+    estimasi_nilai_risiko: number; status: string; created_at: string;
+    accepted_by: string | null; accepted_at: string | null; is_mitigated: boolean;
+  }
+  const [notifs, setNotifs] = useState<NotifItem[]>([]);
+  const [notifBaru, setNotifBaru] = useState(0);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifTab, setNotifTab] = useState<"BARU" | "DITERIMA">("BARU");
+
+  const fetchNotifs = async (tab: "BARU" | "DITERIMA" = notifTab) => {
+    const res = await authFetch(`/api/notifikasi?status=${tab}`);
+    if (!res.ok) return; // role tanpa hak notifikasi mendapat 403: abaikan
+    const data = await res.json();
+    setNotifs(data.items);
+    setNotifBaru(data.baru_count);
+  };
+
+  const terimaNotif = async (id: number) => {
+    const res = await authFetch(`/api/notifikasi/${id}/terima`, { method: "POST" });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      alert(typeof err.detail === "string" ? err.detail : "Gagal menerima notifikasi.");
+    }
+    fetchNotifs();
+  };
+
+  const terimaSemuaNotif = async () => {
+    if (!confirm("Terima semua notifikasi baru?")) return;
+    await authFetch("/api/notifikasi/terima-semua", { method: "POST" });
+    fetchNotifs();
+  };
+
+  // Dari notifikasi langsung ke form mitigasi
+  const mitigasiDariNotif = (n: NotifItem) => {
+    const fromTable = skus.find((x) => x.sku_code === n.sku_code);
+    openMitigasi(
+      fromTable ?? {
+        sku_code: n.sku_code, product_name: n.product_name, category: "-",
+        risk_score: n.risk_score, status: "HIGH RISK", is_mitigated: false,
+      }
+    );
+    setNotifOpen(false);
+  };
 
   // [THRESHOLD] threshold saat ini + form ubah (hanya Data/AI Admin yang melihat form)
   const [thresholdInfo, setThresholdInfo] = useState<{
@@ -116,6 +162,7 @@ export default function App() {
       setPieData(await pieRes.json());
       setBarData(await barRes.json());
       fetchThreshold();
+      if (can(getUser(), "notifikasi_accept")) fetchNotifs();
     } catch (e) {
       console.error(e);
     } finally {
@@ -132,6 +179,14 @@ export default function App() {
     setUser(getUser());
     refreshData();
   }, [filterType]);
+
+  // [NOTIF] segarkan notifikasi tiap 60 detik & saat berganti tab
+  useEffect(() => {
+    if (!can(user, "notifikasi_accept")) return;
+    fetchNotifs(notifTab);
+    const t = setInterval(() => fetchNotifs(notifTab), 60000);
+    return () => clearInterval(t);
+  }, [user, notifTab]);
 
   // [THRESHOLD] pratinjau jumlah SKU HIGH RISK saat nilai diketik (khusus yang berhak mengubah)
   useEffect(() => {
@@ -206,6 +261,94 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* [NOTIF] lonceng notifikasi: hanya Supply Chain / Gudang */}
+          {can(user, "notifikasi_accept") && (
+            <div className="relative">
+              <button
+                onClick={() => setNotifOpen((o) => !o)}
+                className="relative p-2 rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-slate-900"
+                aria-label={`Notifikasi, ${notifBaru} baru`}
+              >
+                <Bell className="w-4 h-4" />
+                {notifBaru > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-600 text-white text-[10px] font-bold flex items-center justify-center">
+                    {notifBaru > 99 ? "99+" : notifBaru}
+                  </span>
+                )}
+              </button>
+
+              {notifOpen && (
+                <div className="absolute right-0 mt-2 w-[26rem] max-w-[92vw] bg-white rounded-xl border border-slate-200 shadow-xl z-40">
+                  <div className="px-4 pt-3 pb-2 border-b border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-sm font-bold text-slate-900">Notifikasi SKU Berisiko Tinggi</h4>
+                      <button onClick={() => setNotifOpen(false)} className="text-slate-400 hover:text-slate-600" aria-label="Tutup">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-1 mt-2 bg-slate-100 p-0.5 rounded-lg w-fit">
+                      {(["BARU", "DITERIMA"] as const).map((t) => (
+                        <button
+                          key={t}
+                          onClick={() => setNotifTab(t)}
+                          className={`px-3 py-1 text-[11px] font-semibold rounded-md ${notifTab === t ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}
+                        >
+                          {t === "BARU" ? `Baru (${notifBaru})` : "Diterima"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="max-h-96 overflow-y-auto divide-y divide-slate-100">
+                    {notifs.length === 0 && (
+                      <p className="px-4 py-8 text-center text-xs text-slate-400 italic">
+                        {notifTab === "BARU" ? "Tidak ada notifikasi baru." : "Belum ada notifikasi yang diterima."}
+                      </p>
+                    )}
+                    {notifs.map((n) => (
+                      <div key={n.id} className="px-4 py-3 space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold text-slate-900 truncate">{n.product_name}</p>
+                            <p className="text-[11px] font-mono text-slate-500">{n.sku_code} • {n.sumber}</p>
+                          </div>
+                          <span className="text-[11px] font-mono font-bold text-red-600 shrink-0">{(n.risk_score * 100).toFixed(1)}%</span>
+                        </div>
+                        <p className="text-[11px] text-slate-600">
+                          Estimasi nilai risiko: <span className="font-semibold text-amber-700">{formatRupiah(n.estimasi_nilai_risiko)}</span>
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {n.status === "DITERIMA" && n.accepted_by ? `Diterima oleh ${n.accepted_by} • ${n.accepted_at}` : `Masuk ${n.created_at}`}
+                        </p>
+                        <div className="flex items-center gap-2 pt-0.5">
+                          {n.status === "BARU" && (
+                            <button onClick={() => terimaNotif(n.id)} className="px-2.5 py-1 text-[11px] font-semibold rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">
+                              Terima
+                            </button>
+                          )}
+                          {n.is_mitigated ? (
+                            <span className="text-[11px] font-semibold text-emerald-600">Sudah ada mitigasi</span>
+                          ) : (
+                            <button onClick={() => mitigasiDariNotif(n)} className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-blue-600 text-white hover:bg-blue-700">
+                              Catat Mitigasi
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {notifTab === "BARU" && notifs.length > 1 && (
+                    <div className="px-4 py-2 border-t border-slate-100 text-right">
+                      <button onClick={terimaSemuaNotif} className="text-[11px] font-semibold text-blue-600 hover:text-blue-700">
+                        Terima semua
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
           {/* [AUDIT] tautan audit trail: hanya Supply Chain & Data/AI Admin */}
           {can(user, "audit_view") && (
             <Link

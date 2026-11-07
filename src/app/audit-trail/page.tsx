@@ -24,11 +24,12 @@ const ROLE_LABELS: Record<string, string> = {
   manajemen: "Manajemen",
 };
 
-const ACTION_OPTIONS = ["LOGIN", "LOGIN_FAILED", "LOGOUT", "CREATE", "UPDATE"];
+const ACTION_OPTIONS = ["LOGIN", "LOGIN_FAILED", "LOGOUT", "CREATE", "UPDATE", "ACCEPT"];
 const ENTITY_OPTIONS = [
   { value: "auth", label: "Autentikasi" },
   { value: "mitigasi", label: "Mitigasi" },
   { value: "threshold", label: "Threshold" },
+  { value: "notifikasi", label: "Notifikasi" },
 ];
 
 const ACTION_STYLE: Record<string, string> = {
@@ -37,6 +38,7 @@ const ACTION_STYLE: Record<string, string> = {
   LOGIN_FAILED: "bg-red-100 text-red-700",
   CREATE: "bg-blue-100 text-blue-700",
   UPDATE: "bg-amber-100 text-amber-700",
+  ACCEPT: "bg-violet-100 text-violet-700",
   DELETE: "bg-red-100 text-red-700",
 };
 
