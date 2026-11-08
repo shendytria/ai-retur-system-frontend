@@ -24,12 +24,13 @@ const ROLE_LABELS: Record<string, string> = {
   manajemen: "Manajemen",
 };
 
-const ACTION_OPTIONS = ["LOGIN", "LOGIN_FAILED", "LOGOUT", "CREATE", "UPDATE", "ACCEPT"];
+const ACTION_OPTIONS = ["LOGIN", "LOGIN_FAILED", "LOGOUT", "CREATE", "UPDATE", "ACCEPT", "EXPORT"];
 const ENTITY_OPTIONS = [
   { value: "auth", label: "Autentikasi" },
   { value: "mitigasi", label: "Mitigasi" },
   { value: "threshold", label: "Threshold" },
   { value: "notifikasi", label: "Notifikasi" },
+  { value: "laporan_dampak", label: "Laporan Dampak" },
 ];
 
 const ACTION_STYLE: Record<string, string> = {
@@ -39,6 +40,7 @@ const ACTION_STYLE: Record<string, string> = {
   CREATE: "bg-blue-100 text-blue-700",
   UPDATE: "bg-amber-100 text-amber-700",
   ACCEPT: "bg-violet-100 text-violet-700",
+  EXPORT: "bg-teal-100 text-teal-700",
   DELETE: "bg-red-100 text-red-700",
 };
 
@@ -128,20 +130,23 @@ export default function AuditTrailPage() {
     <div className="min-h-screen bg-slate-100 text-slate-900 pb-16 font-sans">
       <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-8 py-3.5 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center font-bold text-white text-base shadow-sm">
-            K
+          <Link
+            href="/"
+            className="p-2 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition shadow-sm"
+            title="Kembali ke Dashboard"
+          >
+            <ArrowLeft className="w-4 h-4" />
+          </Link>
+          <div className="h-10 w-10 flex items-center justify-center">
+            <img src="/kalbe-logo.png" alt="Kalbe Logo" className="h-full w-full object-contain" />
           </div>
           <div>
-            <span className="font-bold text-slate-900 tracking-tight text-lg">ONEKalbe EWS</span>
-            <span className="text-xs text-slate-400 block -mt-0.5">Audit Trail • Catatan aktivitas sistem</span>
+            <div className="flex items-center gap-2">
+              <span className="font-extrabold text-slate-900 tracking-tight text-base">ONEKalbe EWS</span>
+            </div>
+            <span className="text-[11px] text-slate-400 block -mt-0.5">Catatan aktivitas integritas sistem</span>
           </div>
         </div>
-        <Link
-          href="/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg px-3 py-1.5 bg-white"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" /> Kembali ke Dashboard
-        </Link>
       </header>
 
       <main className="max-w-7xl mx-auto px-8 pt-8 space-y-6">
@@ -159,9 +164,6 @@ export default function AuditTrailPage() {
                 <ScrollText className="w-5 h-5 text-slate-500" />
                 <div>
                   <h2 className="text-base font-semibold text-slate-900">Riwayat Aktivitas</h2>
-                  <p className="text-xs text-slate-400">
-                    Hanya-baca. Mencatat siapa, kapan, dan apa. Waktu dalam WIB.
-                  </p>
                 </div>
               </div>
 
